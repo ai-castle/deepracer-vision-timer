@@ -5,7 +5,6 @@ model_version = 1
 
 ######## camera ########
 camera_idx = 1   # 0, 1, 2, ...
-camera_idx = "source/test/test_video.mp4" 
 resolution = "HD"     # "HD", "FHD", "qHD"
 camera_rotation_180 = False
 
