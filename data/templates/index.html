@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DeepRacer Vision Timer</title>
+  <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden; /* 스크롤바 숨김 */
+      background-color: #000000;
+    }
+
+    .container-fluid {
+      position: relative;
+      width: 100%;
+      padding-bottom: 56.25%;
+      overflow: hidden;
+    }
+
+    .content-wrapper {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #data-view {
+      min-height: 15%;
+      max-height: 15%;
+      margin: 0; /* 좌우 마진 제거 */
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      background-color: rgb(77, 5, 143);
+      color: white;
+    }
+
+    .bottom-container {
+      background-color: #000000;
+      width: 100%;
+      display: flex;
+      flex-direction: row;
+      justify-content: flex-end;  /* 추가: 우측 정렬을 위한 설정 */
+      margin: 0;
+      padding: 0;
+      height:85%
+    }
+    h5{
+      margin-bottom: 0.1rem;
+      color:yellow;
+    }
+
+    #ranking {
+      flex: 3;
+      flex-grow: 1;  /* 추가: 가능한 모든 공간을 채움 */
+      color: white;
+      margin: 0;
+      padding: 10px;
+      font-size: 1.5vw;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+
+    .video-container {
+      flex: 7;
+      display: flex; /* flexbox 사용 */
+      justify-content: flex-end; /* 우측 정렬 */
+      align-items: flex-start; /* 상단 정렬 */
+      max-width: 80%;
+      /* height: 100%; */
+    }
+
+
+    .video-container img {
+      object-fit: contain; /* 원본 비율 유지 */
+      /*width: 100%;  */
+      /* height: 100%; */
+      max-height: 100%;
+      max-width: 100%;
+      /* margin: 0 auto; */
+      display: block; /* 블록 요소로 설정하여 마진이 작동하게 함 */
+    }
+
+    .data-card {
+      text-align: center;
+      font-size: calc(1rem + 2vw);
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      height: 100%;
+    }
+    .data-card h5{
+      font-size: 2vw;  /* 기본 크기에 뷰포트 너비의 0.5%를 더함 */
+    }
+    .data-card p {
+      font-size: 4vw;  /* 기본 크기에 뷰포트 너비의 0.5%를 더함 */
+    }
+    
+    .ranking-item {
+      display: flex;
+      justify-content: space-between;
+      background-color: #3f3f3f;
+      margin-bottom: 5px;
+      padding: 5px;
+    }
+    
+    .team-name {
+      text-align: left;
+    }
+
+    .highlight {
+      animation: highlight-animation 2s ease;
+    }
+
+    @keyframes highlight-animation {
+      0% { background-color: #3f3f3f; }
+      50% { background-color: yellow; }
+      100% { background-color: #3f3f3f; }
+    }
+
+    .highlight-current-team {
+      background-color: rgb(77, 5, 143);
+    }
+
+    .floating-bar {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      text-align: center;
+      padding: 10px 0;
+      font-size: 1vw;
+    }
+    .floating-bar span{
+      margin: 0 10px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container-fluid">
+    <div class="content-wrapper">
+      <div id="data-view" class="row m-0">
+        <div class="col data-card">
+          <h5>Team</h5>
+          <p id="team"></p>
+        </div>
+        <div class="col data-card">
+          <h5>Best Record</h5>
+          <p id="best"></p>
+        </div>
+        <div class="col data-card">
+          <h5>Current Record</h5>
+          <p id="record"></p>
+        </div>
+        <div class="col data-card">
+          <h5>Trials</h5>
+          <p id="trials"></p>
+        </div>
+        <div class="col data-card">
+          <h5>Laps</h5>
+          <p id="laps"></p>
+        </div>
+        <div class="col data-card">
+          <h5>Offtrack</h5>
+          <p id="offtrack"></p>
+        </div>
+        <div class="col data-card">
+          <h5>Status</h5>
+          <p id="status"></p>
+        </div>
+      </div>
+      <div class="bottom-container">
+        <div id="ranking" class="data-card">
+          <h5>Ranking</h5>
+          <div id="ranking-list"></div>
+        </div>
+        <div class="video-container">
+          <img id="video-stream" src="/video" />
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="floating-bar">
+    <span><b>DeepRacer Vision Timer</b> (github.com/ai-castle/deepracer-vision-timer)</span> | 
+    <span>© <b>AI CASTLE</b> (aicastle.io) All rights reserved.</span>
+  </div>
+
+  <script>
+
+    const startSound = new Audio('/static/start.mp3');
+    const outSound = new Audio('/static/out.wav');
+    const completeSound = new Audio('/static/complete.mp3');
+    const finishSound = new Audio('/static/finish.mp3');
+  
+    let prevStatus = null;
+    let prevLapCount = null;
+    let prevTrialCount = null;
+    function fetchData() {
+      $.get("/get_view_data", function(data) {
+        $("#team").text(data.team_name);
+        $("#status").text(data.status);
+        $("#trials").text(data.trial_count);
+        $("#laps").text(data.lap_count + '/' + data.total_laps);
+        $("#offtrack").text(data.offtrack_count);
+        $("#record").text(data.record_final);
+
+        if (data.status === 'paused')  {
+          if (prevStatus !== data.status) {
+            outSound.play();
+          }
+        } else if (data.status === 'driving') {
+          if (parseInt(data.trial_count, 10) > parseInt(prevTrialCount, 10)){
+            completeSound.play();
+          } else if (parseInt(data.lap_count, 10) > parseInt(prevLapCount, 10)) {
+            startSound.play();
+          } else if (prevStatus !== data.status) {
+            startSound.play();
+          }
+        } else if (data.status === 'finished')  {
+          if (prevStatus !== data.status) {
+            finishSound.play();
+          }
+        }
+
+        prevStatus = data.status;
+        prevLapCount = data.lap_count
+        prevTrialCount =data.trial_count;
+      });
+    }
+
+    setInterval(fetchData, 25);
+    
+
+    let prevRanking = null;
+    let prevBestRecord = null;
+    // 랭킹 정보 가져오기
+    function fetchRanking() {
+      $.get("/get_best_record", function(data) {
+        let rankingHtml = '';
+        let counter = 1;
+
+        const currentTeamName = $("#team").text();  // 현재 화면에 표시된 팀 이름을 가져옵니다.
+        const currentBestRecord = data[currentTeamName];  // 현재 팀의 최고 기록을 가져옵니다.
+        if (currentBestRecord !== prevBestRecord) {  // 이전 최고 기록과 현재 최고 기록을 비교합니다.
+          $("#best").text(currentBestRecord).addClass('highlight');  // 값과 애니메이션을 업데이트합니다.
+          
+          // 2초 후에 하이라이트 애니메이션 제거
+          setTimeout(() => {
+            $("#best").removeClass('highlight');
+          }, 2000);
+          prevBestRecord = currentBestRecord;  // 이전 최고 기록을 업데이트합니다.
+        }
+
+        // 시간이 낮은 순으로 정렬
+        const sortedData = Object.entries(data).sort((a, b) => {
+          if (a[1] === 'none' && b[1] !== 'none') {
+            return 1;
+          }
+          if (a[1] !== 'none' && b[1] === 'none') {
+            return -1;
+          }
+          if (a[1] === 'none' && b[1] === 'none') {
+            return 0;
+          }
+          return parseFloat(a[1].split(":")[1]) - parseFloat(b[1].split(":")[1]);
+        });
+
+        sortedData.forEach(([name, time]) => {
+          if (name === currentTeamName) {
+            rankingHtml += `<div class="ranking-item highlight-current-team"><div class="team-name">[${counter}] ${name}</div><div>${time}</div></div>`;
+          } else {
+            rankingHtml += `<div class="ranking-item"><div class="team-name">[${counter}] ${name}</div><div>${time}</div></div>`;
+          }
+          counter++;
+        });
+
+        // 이전 랭킹과 현재 랭킹을 비교
+        if (JSON.stringify(prevRanking) !== JSON.stringify(sortedData)) {
+          const rankingList = document.getElementById('ranking-list');
+          rankingList.innerHTML = rankingHtml;  // 변경이 있을 때만 DOM 업데이트
+
+          // 하이라이트 애니메이션 적용
+          $(rankingList).children().each(function() {
+            $(this).addClass('highlight');
+          });
+
+          // 2초 후에 하이라이트 애니메이션 제거
+          setTimeout(() => {
+            $(rankingList).children().each(function() {
+              $(this).removeClass('highlight');
+            });
+          }, 2000);
+
+          prevRanking = sortedData;
+        }
+      });
+    }
+
+
+    setInterval(fetchRanking, 1000);  // 1초마다 랭킹 정보 업데이트
+  </script>
+
+</body>
+</html>

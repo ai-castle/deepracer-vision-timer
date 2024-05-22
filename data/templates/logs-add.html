@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pandas Table UI</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            color: #333366;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 80%;
+            margin-left: auto;
+            margin-right: auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #cccccc;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        #add-btn {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #add-btn:hover {
+            background-color: #45a049;
+        }
+        .delete-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 5px 10px;
+        }
+        .delete-btn:hover {
+            background-color: #da190b;
+        }
+        .time-input {
+            border: none;
+            width: 100%;
+            text-align: center;
+        }
+        /* 작은 셀 */
+        .small-cell {
+            width: 100px; /* 원하는 너비로 설정 */
+        }
+    
+        /* 큰 셀 */
+        .large-cell {
+            width: 200px; /* 원하는 너비로 설정 */
+        }
+    </style>
+</head>
+<body>
+
+<h1>Pandas Table</h1>
+<button id="add-btn">Add</button>
+
+<table id="data-table">
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Valid</th>
+            <th>Team Name</th>
+            <th class="small-cell">Record Final</th>
+            <th class="small-cell">Record Origin</th>
+            <th class="small-cell">Offtrack Count</th>
+            <th class="small-cell">Team Penalty</th>
+            <th class="small-cell">Start Time</th>
+            <th class="small-cell">Finish Time</th>
+            <th class="large-cell">Memo</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in table %}
+        <tr>
+            <td class="ID">{{ row.ID }}</td>
+            <td class="valid" contenteditable="true">{{ row.valid }}</td>
+            <td class="team_name" contenteditable="true">{{ row.team_name }}</td>
+            <td class="record_final" contenteditable="true">{{ row.record_final }}</td>
+            <td class="record_origin" contenteditable="true">{{ row.record_origin }}</td>
+            <td class="offtrack_count" contenteditable="true">{{ row.offtrack_count }}</td>
+            <td class="team_penalty" contenteditable="true">{{ row.team_penalty }}</td>
+            <td class="start_time"><input type="text" value="{{ row.start_time }}" class="time-input start_time"></td>
+            <td class="finish_time"><input type="text" value="{{ row.finish_time }}" class="time-input finish_time"></td>
+            <td class="memo" contenteditable="true">{{ row.memo }}</td>
+            <td><button class="delete-btn">Delete</button></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+    $(document).ready(function() {
+        // 기존 데이터 수정
+        $("td[contenteditable=true]").blur(function() {
+            var id = $(this).siblings('.ID').text();
+            var field = $(this).attr("class");
+            var value = $(this).text();
+
+            if (field === 'record_final' || field === 'record_origin') {
+                var timePattern = /^\d{2}:\d{2}\.\d{3}$/;
+                if (!timePattern.test(value)) {
+                    alert("시간 형식이 잘못되었습니다. MM:SS.sss 형식으로 입력해주세요.");
+                    return;  
+                }
+            }
+    
+            if (field === 'valid') {
+                if (value !== 'True' && value !== 'False') {
+                    alert("Valid 열은 True 또는 False만 가능합니다.");
+                    return;  
+                }
+            }
+
+            $.ajax({
+                url: '/logs/update',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ 'ID': id, 'Field': field, 'Value': value }),
+                success: function(response) {
+                    console.log(response);
+                }
+            });
+        });
+    
+        // 행 삭제
+        $(".delete-btn").click(function() {
+            var isConfirmed = confirm("정말로 삭제하시겠습니까?");
+            
+            if (!isConfirmed) {
+                return;
+            }
+    
+            var row = $(this).closest("tr");
+            var id = row.find(".ID").text();
+        
+            $.ajax({
+                url: '/logs/delete',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ 'ID': id }),
+                success: function(response) {
+                    console.log(response);
+                    row.remove();
+                }
+            });
+        });
+    
+        // 새로운 행 추가
+        $("#add-btn").click(function() {
+            var maxID = 0;
+            $(".ID").each(function() {
+                var currentID = parseInt($(this).text());
+                if (currentID > maxID) {
+                    maxID = currentID;
+                }
+            });
+            maxID++;
+    
+            var newRow = {
+                "ID": maxID,
+                "valid": "False",
+                "team_name": "tema name",
+                "record_final": "99:99.999",
+                "record_origin": "99:99.999",
+                "offtrack_count": "0",
+                "team_penalty": "0",
+                "start_time": "99:99:99.999",
+                "finish_time": "99:99:99.999",
+                "memo": ""
+            };
+    
+            $.ajax({
+                url: '/logs/add',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(newRow),
+                success: function(response) {
+                    console.log(response);
+                    var newRowHTML = `
+                    <tr>
+                        <td class="ID">${maxID}</td>
+                        <td class="valid" contenteditable="true">False</td>
+                        <td class="team_name" contenteditable="true">tema name</td>
+                        <td class="record_final" contenteditable="true">99:99.999</td>
+                        <td class="record_origin" contenteditable="true">99:99.999</td>
+                        <td class="offtrack_count" contenteditable="true">0</td>
+                        <td class="team_penalty" contenteditable="true">0</td>
+                        <td class="start_time"><input type="text" value="" class="time-input">99:99:99.999</td>
+                        <td class="finish_time"><input type="text" value="" class="time-input">99:99:99.999</td>
+                        <td class="memo" contenteditable="true"></td>
+                        <td><button class="delete-btn">Delete</button></td>
+                    </tr>`;
+                    $("#data-table tbody").prepend(newRowHTML); // 행을 테이블의 처음에 추가
+                }
+            });
+        });
+    
+        // Start Time과 Finish Time 형식 검사
+        $(".time-input").blur(function() {
+            var id = $(this).closest('tr').find('.ID').text();
+            var field = $(this).closest('td').attr('class');
+            var value = $(this).val();
+    
+            var timePattern = /^\d{2}:\d{2}:\d{2}\.\d{3}$/;
+            if (!timePattern.test(value)) {
+                alert("시간 형식이 잘못되었습니다. HH:MM:SS.sss 형식으로 입력해주세요.");
+                return;
+            }
+    
+            $.ajax({
+                url: '/logs/update',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ 'ID': id, 'Field': field, 'Value': value }),
+                success: function(response) {
+                    console.log(response);
+                }
+            });
+        });
+    });
+    </script>
+    
+</body>
+</html>

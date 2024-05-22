@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Remote Control</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        #actionButtons > .btn {
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        #btnFinish {
+            margin-left: auto;
+            margin-right: 0;
+            display: block;
+        }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let prevStatus = null;
+
+        function initialize() {
+            $.getJSON("/get_initial_settings", function(data) {
+                $("#teamName").val(data.team_name);
+                $("#observeOn").prop('checked', Boolean(data.observe_on));
+                $("#autoStartOn").prop('checked', Boolean(data.auto_start_on));
+                $("#finishTime").val(data.finish_time);
+            });
+
+            getStatus();
+        }
+
+        
+        function getStatus() {
+            $.getJSON("/get_status", function(data) {
+                const status = data.status;
+                if (status !== prevStatus) {
+                    $("#currentStatus").text("Status: " + status);
+                    let actionButtons = "";
+                    let finishButton = "";
+        
+                    if (status === "waiting") {
+                        actionButtons = "<button class='btn btn-primary' id='btnReady' onclick=\"sendAction('ready')\">Ready</button>";
+                    } else if (status === "ready") {
+                        actionButtons = "<button class='btn btn-success' id='btnStart' onclick=\"sendAction('start')\">Start</button>";
+                        finishButton = "<button class='btn btn-danger' id='btnFinish' onclick=\"sendAction('finish')\">Finish</button>";
+                    } else if (status === "driving") {
+                        actionButtons = "<button class='btn btn-success' id='btnStart' onclick=\"sendAction('complete')\">Complete</button><button class='btn btn-warning' id='btnOut' onclick=\"sendAction('out')\">Out</button>";
+                        finishButton = "<button class='btn btn-danger' id='btnStop' onclick=\"sendAction('stop')\">Stop</button>";
+                    } else if (status === "paused") {
+                        actionButtons = "<button class='btn btn-success' id='btnStart' onclick=\"sendAction('start')\">Start</button>";
+                        finishButton = "<button class='btn btn-danger' id='btnStop' onclick=\"sendAction('stop')\">Stop</button>";
+                    } else if (status === "finished") {
+                        actionButtons = "<button class='btn btn-secondary' id='btnReset' onclick=\"sendAction('reset')\">Reset</button>";
+                    }
+        
+                    $("#actionButtons").html(actionButtons);
+                    if (finishButton) {
+                        $("#actionButtons").append("<div style='flex: 1;'></div>" + finishButton);
+                    }
+        
+                    if (status === "waiting") {
+                        // "Ready" 버튼의 활성화 상태를 팀 이름에 따라 결정
+                        $("#btnReady").prop("disabled", !$("#teamName").val());
+                    }
+                    
+                    // 팀 이름 선택 상자의 활성화 상태를 상태에 따라 결정
+                    $("#teamName").prop("disabled", status !== "waiting");
+        
+                    prevStatus = status;
+                } else {
+                    // 상태가 "waiting"이면 "Ready" 버튼의 활성화 상태를 계속 체크
+                    if (status === "waiting") {
+                        $("#btnReady").prop("disabled", !$("#teamName").val());
+                    }
+                }
+            });
+        }
+        
+
+        function updateFinishTime() {
+            const finishTime = $("#finishTime").val();
+            const isValid = /^(\d{2}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})$/.test(finishTime);
+
+            if (isValid) {
+                $.post("/update_finish_time", { finish_time: finishTime });
+            } else {
+                alert("Invalid finish time. Please enter the time in 'YY-MM-DD HH:MM:SS' format.");
+            }
+        }
+
+        $(document).ready(function(){
+            initialize();
+            setInterval(getStatus, 50);
+            $("#teamName").change(updateTeam);
+            $("#observeOn").change(updateObserveOn);
+            $("#autoStartOn").change(updateAutoStartOn);
+            $("#finishTime").change(updateFinishTime);
+
+            $(document).keydown(function(event) {
+                if (event.which === 13) {
+                    $("#btnStart").click();
+                } else if (event.which === 32) {
+                    $("#btnOut").click();
+                } else if (event.which === 27) {
+                    $("#btnStop").click();
+                }
+            });
+        });
+
+        function updateTeam() {
+            $.post("/update_team", { team_name: $("#teamName").val() });
+        }
+
+        function updateObserveOn() {
+            $.post("/update_observe_on", { observe_on: $("#observeOn").is(":checked") ? 1 : 0 });
+        }
+
+        function updateAutoStartOn() {
+            $.post("/update_auto_start_on", { auto_start_on: $("#autoStartOn").is(":checked") ? 1 : 0 });
+        }
+
+        function sendAction(actionType) {
+            $.post("/update_action", { action: actionType });
+        }
+
+    </script>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Remote Control</h1>
+        <div class="form-group">
+            <label for="teamName">Team</label>
+            <select id="teamName" class="form-control">
+                {% for team in team_name_list %}
+                    <option value="{{ team }}">{{ team }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="observeOn">
+            <label class="form-check-label" for="observeOn">Observe</label>
+        </div>
+        <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="autoStartOn">
+            <label class="form-check-label" for="autoStartOn">Auto Start</label>
+        </div>
+        <div class="form-group mt-2">
+            <label for="finishTime">Finish Time</label>
+            <input type="text" id="finishTime" class="form-control">
+        </div>
+        <div class="mt-4">
+            <h3 id="currentStatus"></h3>
+        </div>
+        <div class="mt-4 d-flex flex-wrap align-items-start" id="actionButtons"></div>
+    </div>
+</body>
+</html>

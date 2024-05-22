@@ -1,0 +1,9 @@
+ultralytics==8.2.13
+pytz
+requests
+tqdm
+numpy
+matplotlib
+numba
+Flask
+openpyxl
