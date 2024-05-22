@@ -12,7 +12,7 @@ import numpy as np
 import cv2
 
 def detect_model_fn(
-    shared_dict, detect_model_looptime, boost_mode, out_wheel_num, device, observe_on, start_tf, out_tf, start_pt_arr, off_track_tf_arr1, off_fence_tf_arr2, shape_detect, shape_yolo_output, detect_confidence_min, capture_arr_ctypes, capture_arr2_ctypes, detect_best_arr_ctypes, detect_model_timestamp, capture_timestamp, detect_model_path, shape_capture
+    shared_dict, detect_model_looptime, decision_point, boost_mode, out_wheel_num, device, observe_on, start_tf, out_tf, start_pt_arr, off_track_tf_arr1, off_fence_tf_arr2, shape_detect, shape_yolo_output, detect_confidence_min, capture_arr_ctypes, capture_arr2_ctypes, detect_best_arr_ctypes, detect_model_timestamp, capture_timestamp, detect_model_path, shape_capture
     ):
     try :
         time_buffer = deque(maxlen=20)
@@ -77,7 +77,11 @@ def detect_model_fn(
                             predict_keypoints_flatten_best[6] = min(shape_capture[1]-1, predict_keypoints_flatten_best[6]*shape_ratio[1])
                             predict_keypoints_flatten_best[7] = min(shape_capture[0]-1, predict_keypoints_flatten_best[7]*shape_ratio[0])
                             predict_detect_best = np.concatenate([predict_boxes_best, predict_keypoints_flatten_best])
-                            x1, y1, x2, y2, x3, y3, x4, y4 = map(int, predict_detect_best[6:])
+                            if decision_point == "wheel":
+                                x1, y1, x2, y2, x3, y3, x4, y4 = map(int, predict_detect_best[6:])
+                            else : # decision_point == "bounding_box"
+                                x1, y1, x2, y2 = map(int, predict_detect_best[:4])
+                                x3, x4, y3, y4 = x1, x2, y2, y1
                             out_sum = off_track_tf_arr1[[y1,y2,y3,y4],[x1,x2,x3,x4]].sum()
                             out_tf_value = 1 if out_sum >= out_wheel_num else 0
                             start_tf_value = rectangle_line_intersect(predict_detect_best[:4], start_pt_arr)
