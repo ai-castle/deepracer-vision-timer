@@ -3,7 +3,10 @@ current_path_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_path_dir)
 parent_path_dir = os.path.dirname(current_path_dir)
 sys.path.append(parent_path_dir)
+import hparams as hp
+import config as cf
 
+from util_functions import get_arr_shape
 import cv2
 import numpy as np
 from collections import deque
@@ -11,7 +14,11 @@ import time
 import traceback
 
 
-def camera_fn(shared_dict, capture_looptime, camera_rotation_180, capture_arr_ctypes, capture_timestamp, camera_idx, shape_capture):
+camera_idx = cf.camera_idx
+shape_capture, shape_detect = get_arr_shape()
+camera_rotation_180 = cf.camera_rotation_180
+
+def camera_fn(shared_dict, camera_looptime, capture_arr_ctypes, camera_timestamp):
     try :
         time_buffer = deque(maxlen=20)
         capture_arr = np.frombuffer(capture_arr_ctypes.get_obj(), dtype=np.uint8).reshape(shape_capture)
@@ -54,12 +61,12 @@ def camera_fn(shared_dict, capture_looptime, camera_rotation_180, capture_arr_ct
 
             # 공유 변수에 저장
             capture_arr[:, :, :] = frame
-            capture_timestamp.value = s_time
-            capture_looptime.value = sum(time_buffer) / max(len(time_buffer),1)
+            camera_timestamp.value = s_time
+            camera_looptime.value = sum(time_buffer) / max(len(time_buffer),1)
             
             # 파일이 경우, fps가 너무 높게 나오는 것을 방지
             while True:
-                if time.time() - s_time > spf :
+                if time.time() - s_time > spf - 0.001 :
                     break
 
             # 버퍼

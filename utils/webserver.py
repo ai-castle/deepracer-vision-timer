@@ -3,8 +3,10 @@ current_path_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_path_dir)
 parent_path_dir = os.path.dirname(current_path_dir)
 sys.path.append(parent_path_dir)
-from util_functions import time_to_str, str_to_time, seconds_to_str, str_to_seconds
+import hparams as hp
+import config as cf
 
+from util_functions import status2str_dict, str2action_dict, get_arr_shape, time_to_str, str_to_time, seconds_to_str, str_to_seconds
 from flask import Flask, Response, render_template, request, jsonify, stream_with_context
 import pandas as pd
 import os
@@ -33,11 +35,11 @@ app = Flask(__name__, template_folder=template_dir, static_folder = static_dir)
 # app.logger.setLevel(logging.INFO)
 
 
-def webserver_fn(shared_dict,
-    status, start_time, trial_count, lap_count, offtrack_count, record_origin, record_final, total_laps,
-    status2str_dict, str2action_dict, action, finish_time, auto_start_on, observe_on, team_name, team_name_list, 
-    port_webserver, capture_arr3_ctypes, shape_capture, # video_looptime
-    ):
+shape_capture, shape_detect = get_arr_shape()
+total_laps = cf.total_laps
+team_name_list = cf.team_name_list
+port_webserver = hp.port_webserver
+def webserver_fn(shared_dict, capture_arr3_ctypes,status, start_time, trial_count, lap_count, offtrack_count, record_origin, record_final, action, finish_time, auto_start_on, observe_on, team_name):
     try:
         capture_arr3 = np.frombuffer(capture_arr3_ctypes.get_obj(), dtype=np.uint8).reshape(shape_capture)
         

@@ -3,21 +3,68 @@ current_path_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_path_dir)
 parent_path_dir = os.path.dirname(current_path_dir)
 sys.path.append(parent_path_dir)
-
 import hparams as hp
 import config as cf
+
 import pytz
 from datetime import datetime, timedelta
 from numba import jit
 import requests
 from tqdm import tqdm
 import cv2
-import traceback
-
 import socket
-
 import time
 from collections import deque
+
+
+
+status2str_dict = {
+    0 : 'waiting',
+    1 : 'ready',
+    2 : 'driving',
+    3 : 'paused',
+    4 : 'finished'
+}
+str2status_dict = {value: key for key, value in status2str_dict.items()}
+status_list = list(status2str_dict.values())
+
+action2str_dict = {
+    0 : 'none',
+    1 : 'ready',
+    2 : 'start',
+    3 : 'out',
+    4 : 'stop',
+    5 : 'complete',
+    6 : 'finish',
+    7 : 'reset'
+}
+str2action_dict = {value: key for key, value in action2str_dict.items()}
+action_list = list(action2str_dict.values())
+
+
+# ['waiting', 'ready', 'driving', 'paused', 'finished']
+def observe_to_action_str(status_str, out_tf_value, start_tf_value, detect_best_arr, finish_time_value) :
+    if finish_time_value < time.time() :
+        return 'finish', None
+    elif status_str == 'waiting' :
+        return 'none', None
+    elif status_str == 'ready' :
+        if (out_tf_value == 0) and (start_tf_value == 1) :
+            return 'start', None
+        else :
+            return 'none', None
+    elif status_str == 'driving' :
+        if out_tf_value == 1 :
+            return 'out', detect_best_arr.copy()
+        elif start_tf_value == 1 :
+            return 'complete', None
+        else :
+            return 'none', None
+    elif status_str == 'paused' :
+        return 'none', None
+    elif status_str == 'finished' :
+        return 'none', None
+
 
 
 data_queue = deque(maxlen=hp.error_detection_deque_max_length)
@@ -49,7 +96,7 @@ def error_detection_handler(boxes, timestamp,
 		x_prev, y_prev, timestamp_prev, velocity_prev = data_queue[-1]
 		time_delta =  max(0.01, timestamp - timestamp_prev)
 		moving_delta = ((x - x_prev)**2 + (y - y_prev)**2)**0.5
-		if moving_delta < (mean_velocity * time_delta + box_diagonal_length) * (1 + threshold):
+		if moving_delta < mean_velocity * time_delta + box_diagonal_length * threshold :
 			velocity = moving_delta / time_delta
 			data_queue.append((x, y, timestamp, velocity))
 			return True
@@ -180,7 +227,7 @@ def download_model(model_version, model_type):
     
     return download_path
                     
-def get_resolution_config(resolution):
+def get_resolution_config(resolution = cf.resolution):
     if resolution == "FHD" :
         camera_capture_width = 1920
         camera_capture_height = 1080
@@ -205,6 +252,13 @@ def get_resolution_config(resolution):
         raise Exception("The resolution is not allowed. Resolutions can only be FHD, HD, or QHD.")
 
     return camera_capture_width, camera_capture_height, detect_input_width, detect_input_height
+
+
+def get_arr_shape(resolution = cf.resolution):
+    camera_capture_width, camera_capture_height, detect_input_width, detect_input_height = get_resolution_config(resolution)
+    shape_capture = (camera_capture_height, camera_capture_width, 3)
+    shape_detect = (detect_input_height, detect_input_width, 3)
+    return shape_capture, shape_detect
 
 time_zone = cf.time_zone
 target_timezone = pytz.timezone(time_zone)

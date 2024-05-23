@@ -3,13 +3,20 @@ current_path_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_path_dir)
 parent_path_dir = os.path.dirname(current_path_dir)
 sys.path.append(parent_path_dir)
-from util_functions import time_to_str2
+import hparams as hp
+import config as cf
 
+from util_functions import time_to_str2
 import time
-import pandas as pd
 import traceback
 
-def save_fn(shared_dict, team_name_list, logs_excel_path, logs_pickle_path, df_logs_path, excel_logs_path, log_saving_interval_seconds):
+team_name_list = cf.team_name_list
+df_logs_path = hp.df_logs_path
+excel_logs_path = hp.excel_logs_path
+logs_pickle_path = hp.logs_pickle_path
+logs_excel_path = hp.logs_excel_path
+log_saving_interval_seconds = hp.log_saving_interval_seconds
+def save_fn(shared_dict):
     try :
         os.makedirs(logs_pickle_path, exist_ok=True)
         os.makedirs(logs_excel_path, exist_ok=True)

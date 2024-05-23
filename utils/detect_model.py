@@ -3,17 +3,30 @@ current_path_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_path_dir)
 parent_path_dir = os.path.dirname(current_path_dir)
 sys.path.append(parent_path_dir)
-from util_functions import modify_array, rectangle_line_intersect, error_detection_handler
+import hparams as hp
+import config as cf
+
+from util_functions import get_off_fence_tf_arr, get_off_track_tf_arr, get_arr_shape, download_model, modify_array, rectangle_line_intersect, error_detection_handler
 import traceback
 from ultralytics import YOLO
 from collections import deque
 import time
 import numpy as np
 import cv2
+import torch
 
-def detect_model_fn(
-    shared_dict, detect_model_looptime, decision_point, boost_mode, out_wheel_num, device, observe_on, start_tf, out_tf, start_pt_arr, off_track_tf_arr1, off_fence_tf_arr2, shape_detect, shape_yolo_output, detect_confidence_min, capture_arr_ctypes, capture_arr2_ctypes, detect_best_arr_ctypes, detect_model_timestamp, capture_timestamp, detect_model_path, shape_capture
-    ):
+detect_model_path = download_model(cf.model_version, cf.model_type)
+shape_capture, shape_detect = get_arr_shape()
+start_pt_arr = np.array(cf.starting_line_endpoints).flatten()
+out_wheel_num = hp.out_wheel_num
+decision_point = hp.decision_point
+shape_yolo_output = hp.shape_yolo_output
+detect_confidence_min= hp.detect_confidence_min
+off_track_tf_arr1, off_track_tf_arr2 = get_off_track_tf_arr()
+off_fence_tf_arr1, off_fence_tf_arr2 = get_off_fence_tf_arr()
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+def detect_model_fn(shared_dict, detect_model_looptime, observe_on, start_tf, out_tf, capture_arr_ctypes, capture_arr2_ctypes, detect_best_arr_ctypes, detect_model_timestamp, camera_timestamp):
     try :
         time_buffer = deque(maxlen=20)
         capture_arr = np.frombuffer(capture_arr_ctypes.get_obj(), dtype=np.uint8).reshape(shape_capture)
@@ -22,25 +35,17 @@ def detect_model_fn(
         shape_ratio = (np.array(shape_capture) / np.array(shape_detect))[:2]
         model_detect = YOLO(detect_model_path).to(device)
         resized_image_test = cv2.resize(capture_arr, shape_detect[:2][::-1])
-        model_detect(resized_image_test, verbose=False)  # 모델 예측이 첫번째꺼가 너무 느려서 그냥 한번 예측함
+        model_detect(resized_image_test, verbose=False)  # cold start
         
-        # gray_mean = cv2.cvtColor(resized_image_test, cv2.COLOR_BGR2GRAY)
-        # gray_prev = gray_mean.copy()
-        # prod_shape = shape_detect[0] * shape_detect[1]
-        
-        capture_timestamp_value_prev = 0
+        camera_timestamp_value_prev = 0
         shared_dict['ready_detect'] = True
         while True :
-            if boost_mode :
+            while True :
                 s_time = time.time()
-                capture_timestamp_value = capture_timestamp.value
-            else :
-                while True :
-                    s_time = time.time()
-                    capture_timestamp_value = capture_timestamp.value
-                    if capture_timestamp_value > capture_timestamp_value_prev :
-                        capture_timestamp_value_prev = capture_timestamp_value
-                        break
+                camera_timestamp_value = camera_timestamp.value
+                if camera_timestamp_value > camera_timestamp_value_prev :
+                    camera_timestamp_value_prev = camera_timestamp_value
+                    break
             capture_arr_copy = capture_arr.copy()
             resized_image = cv2.resize(capture_arr_copy, shape_detect[:2][::-1])
             modify_array(resized_image, off_fence_tf_arr2)
@@ -65,7 +70,7 @@ def detect_model_fn(
                         predict_boxes_best[1] = min(shape_capture[0]-1, predict_boxes_best[1]*shape_ratio[0])
                         predict_boxes_best[2] = min(shape_capture[1]-1, predict_boxes_best[2]*shape_ratio[1])
                         predict_boxes_best[3] = min(shape_capture[0]-1, predict_boxes_best[3]*shape_ratio[0])
-                        box_error_validation = error_detection_handler(predict_boxes_best[:4], capture_timestamp_value)
+                        box_error_validation = error_detection_handler(predict_boxes_best[:4], camera_timestamp_value)
                         if box_error_validation :
                             predict_keypoints_flatten_best = predict_keypoints[0].cpu().numpy().flatten()
                             predict_keypoints_flatten_best[0] = min(shape_capture[1]-1, predict_keypoints_flatten_best[0]*shape_ratio[1])
@@ -91,7 +96,7 @@ def detect_model_fn(
             detect_best_arr[:] = predict_detect_best
             out_tf.value = out_tf_value
             start_tf.value = start_tf_value
-            detect_model_timestamp.value = capture_timestamp_value
+            detect_model_timestamp.value = camera_timestamp_value
             detect_model_looptime.value = sum(time_buffer) / max(len(time_buffer),1)
                     
             # 시간 계산
