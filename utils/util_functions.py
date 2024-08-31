@@ -211,6 +211,7 @@ def download_model(model_version, model_type):
     download_url = f"https://pub-a06c1fb0ad3e476f910f5ce72aff9f9b.r2.dev/shared_resources/models/{model_name}.pt"
     download_path = f"./data/saved_model/{model_name}.pt"
     if not os.path.isfile(download_path):
+        os.makedirs("./data/saved_model/", exist_ok=True)
         try :
             print(f"trying {model_name} download...")
             with requests.get(download_url, stream=True) as r:
