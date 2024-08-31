@@ -427,9 +427,9 @@ if __name__ == '__main__':
         if ready_all_done :
             f_time = time.time()
             if f_time - s_time > 10 :
-                camera_fps = int(1 / camera_looptime.value)
-                detect_fps = int(1 / detect_model_looptime.value)
-                display_fps = int(1 / display_looptime.value)
+                camera_fps = int(1 / max(1e-5, camera_looptime.value))
+                detect_fps = int(1 / max(1e-5, detect_model_looptime.value))
+                display_fps = int(1 / max(1e-5, display_looptime.value))
                 print(f"[FPS] camera : {camera_fps} < detect model : {detect_fps} < display : {display_fps}")
                 s_time = f_time
         else :

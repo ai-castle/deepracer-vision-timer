@@ -17,7 +17,7 @@ log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 import numpy as np
 import cv2
-
+import time
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 template_dir = os.path.join(current_dir, '../data/templates')
@@ -132,7 +132,14 @@ def webserver_fn(shared_dict, capture_arr3_ctypes,status, start_time, trial_coun
 
         @app.route('/get_best_record')
         def get_best_record():
-            return jsonify(shared_dict['best_record_srr'].to_dict())
+            for _ in range(10):
+                try :
+                    return jsonify(shared_dict['best_record_srr'].to_dict())
+                except Exception as e :
+                    error = e
+                    time.sleep(1)
+            raise error
+
 
         @app.route('/get_initial_settings')
         def get_initial_settings():
